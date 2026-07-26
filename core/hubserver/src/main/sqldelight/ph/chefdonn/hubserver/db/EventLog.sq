@@ -1,0 +1,30 @@
+CREATE TABLE IF NOT EXISTS event_log (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  command_id TEXT,
+  at INTEGER NOT NULL,
+  payload TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS event_log_command_id ON event_log(command_id);
+
+insertEvent:
+INSERT INTO event_log(command_id, at, payload)
+VALUES (?, ?, ?);
+
+lastInsertSeq:
+SELECT last_insert_rowid();
+
+eventsSince:
+SELECT seq, payload
+FROM event_log
+WHERE seq > :afterSeq
+ORDER BY seq ASC;
+
+appliedCommandIds:
+SELECT DISTINCT command_id
+FROM event_log
+WHERE command_id IS NOT NULL;
+
+currentSeq:
+SELECT COALESCE(MAX(seq), 0)
+FROM event_log;
