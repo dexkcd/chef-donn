@@ -1,0 +1,145 @@
+/* Chef Donn's design tokens — colors, type scale, spacing.
+   Source of truth: Claude Design project 4f624b38-8da4-471f-b3d2-387da1d795bf
+   ("Chef Donn's Design System"); fetch with DesignSync before changing values.
+
+   Day scheme (cream) for waiter/cashier, Night (dark) for kitchen — chosen by
+   ROLE via <html data-scheme="night">, never by the system theme: a kitchen
+   tablet is always dark, a waiter phone always light. */
+
+/* Fonts are self-hosted: nothing is fetched from a CDN, so the apps keep their
+   typography during a brownout with no internet. */
+@font-face {
+  font-family: "Archivo";
+  src: url("../fonts/archivo_variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face { font-family: "Barlow"; src: url("../fonts/barlow_regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("../fonts/barlow_semibold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("../fonts/barlow_bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/barlowcondensed_semibold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/barlowcondensed_bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibmplexmono_regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibmplexmono_semibold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibmplexmono_bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+:root {
+  /* Brand scales */
+  --cream: #f4f1ea;
+  --cream-deep: #e8e2d3;
+  --green: #0f4d3a;
+  --green-deep: #0a3427;
+  --green-bright: #1e8f5e;
+  --red: #c8102e;
+  --red-deep: #8f0b21;
+  --red-bright: #e6394f;
+  --gold: #d9a441;
+  --gold-deep: #b3822b;
+  --gold-bright: #f0bd5e;
+  --black: #1a1a1a;
+  --white: #ffffff;
+
+  --ink-70: #3c3c3a;
+  --ink-50: #6b6963;
+  --ink-30: #a19d92;
+  --ink-15: #d8d3c4;
+  --ink-05: #efebe0;
+
+  --night-95: #0c0f0d;
+  --night-85: #14201b;
+  --night-70: #1e2e27;
+  --night-50: #31463c;
+  --night-30: #4c665a;
+  --night-10: #8fa89b;
+  --night-text: #f3f1e8;
+
+  --cooking-day: #e0762d;
+  --cooking-night: #ff8a3d;
+  --ready-night: #35c281;
+
+  /* Spacing — DonnDimens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Tap targets: 56px minimum, 72px the wet-finger default */
+  --tap-min: 56px;
+  --tap-comfortable: 72px;
+
+  /* Thick borders over shadows */
+  --border-thin: 1.5px;
+  --border-thick: 3px;
+  --border-heavy: 5px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --font-display: "Archivo", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+  --font-label: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Day scheme — waiter + cashier */
+  --bg: var(--cream);
+  --surface: var(--white);
+  --surface-sunken: var(--cream-deep);
+  --border: var(--ink-15);
+  --border-strong: var(--black);
+  --text-primary: var(--black);
+  --text-secondary: var(--ink-50);
+  --text-inverse: var(--cream);
+  --accent-green: var(--green);
+  --accent-red: var(--red);
+  --accent-gold: var(--gold);
+  --on-accent: var(--cream);
+  --on-accent-red: var(--white);
+  --on-gold: var(--black);
+  --scrim: rgba(20, 20, 20, 0.55);
+
+  --status-queued-bg: var(--gold);
+  --status-queued-fg: var(--black);
+  --status-cooking-bg: var(--cooking-day);
+  --status-cooking-fg: var(--white);
+  --status-ready-bg: var(--green-bright);
+  --status-ready-fg: var(--white);
+  --status-served-bg: var(--ink-30);
+  --status-served-fg: var(--white);
+  --status-voided-bg: var(--red);
+  --status-voided-fg: var(--white);
+}
+
+/* Night scheme — kitchen only */
+[data-scheme="night"] {
+  --bg: var(--night-95);
+  --surface: var(--night-85);
+  --surface-sunken: var(--night-70);
+  --border: var(--night-50);
+  --border-strong: var(--night-50);
+  --text-primary: var(--night-text);
+  --text-secondary: var(--night-10);
+  --text-inverse: var(--night-95);
+  --accent-green: var(--green-bright);
+  --accent-red: var(--red-bright);
+  --accent-gold: var(--gold-bright);
+  --on-accent: var(--night-95);
+  --on-accent-red: var(--night-95);
+  --on-gold: var(--night-95);
+
+  --status-queued-bg: var(--gold-bright);
+  --status-queued-fg: var(--night-95);
+  --status-cooking-bg: var(--cooking-night);
+  --status-cooking-fg: var(--night-95);
+  --status-ready-bg: var(--ready-night);
+  --status-ready-fg: var(--night-95);
+  --status-served-bg: var(--night-30);
+  --status-served-fg: var(--night-text);
+  --status-voided-bg: var(--red-bright);
+  --status-voided-fg: var(--night-95);
+}

@@ -1,0 +1,71 @@
+/* Cashier layout — a wall of running tabs. Read-only by design: the only
+   control on this screen is Mark Billed. Totals are large mono so they can be
+   keyed into the restaurant's existing POS without a second look. */
+
+.tabs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.tab-card {
+  background: var(--surface);
+  border: var(--border-thick) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Everything plated and run: this table is ready to settle. */
+.tab-card--settleable { border-color: var(--accent-green); }
+
+.tab-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border-bottom: var(--border-thick) solid var(--border-strong);
+}
+.tab-card__table { font-family: var(--font-display); font-weight: 900; font-size: 30px; }
+.tab-card__meta { font-family: var(--font-label); font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+
+.tab-card__lines { padding: 0 var(--space-4); }
+
+.cline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-thin) solid var(--border);
+}
+.cline:last-child { border-bottom: 0; }
+.cline__qty { font-family: var(--font-mono); font-weight: 700; min-width: 32px; }
+.cline__name { font-weight: 600; }
+.cline__amount { font-family: var(--font-mono); font-weight: 600; margin-left: auto; }
+/* A voided line stays visible and struck through — a line that silently
+   vanishes is exactly how a cashier bills wrong. */
+.cline--voided .cline__name,
+.cline--voided .cline__amount { text-decoration: line-through; color: var(--text-secondary); }
+
+.tab-card__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-top: var(--border-thick) solid var(--border-strong);
+}
+.tab-card__total-label { font-family: var(--font-label); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; text-transform: uppercase; }
+.tab-card__total-value { font-family: var(--font-mono); font-weight: 700; font-size: 32px; }
+
+.tab-card__foot { padding: 0 var(--space-4) var(--space-4); }
+
+.pending-note {
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-label);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+}

@@ -1,0 +1,58 @@
+/* KDS layout — a rail of ticket cards, read across a hot line from two metres
+   away. Everything is bigger than the waiter app and the type is heavier. */
+
+.rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.ticket {
+  background: var(--surface);
+  border: var(--border-heavy) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Age is a border state, not a decoration: an old ticket is a late plate. */
+.ticket--warn { border-color: var(--accent-gold); }
+.ticket--late { border-color: var(--accent-red); }
+
+.ticket__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border-bottom: var(--border-thick) solid var(--border-strong);
+}
+.ticket__table { font-family: var(--font-display); font-weight: 900; font-size: 32px; }
+.ticket__covers { font-family: var(--font-label); font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+.ticket__timer { margin-left: auto; font-family: var(--font-mono); font-weight: 700; font-size: 24px; }
+.ticket--warn .ticket__timer { color: var(--accent-gold); }
+.ticket--late .ticket__timer { color: var(--accent-red); }
+
+.ticket__lines { display: flex; flex-direction: column; }
+
+.kline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-thin) solid var(--border);
+  min-height: var(--tap-comfortable);
+  cursor: pointer;
+}
+.kline:last-child { border-bottom: 0; }
+.kline__qty { font-family: var(--font-mono); font-weight: 700; font-size: 24px; min-width: 40px; }
+.kline__name { font-weight: 700; font-size: 20px; }
+.kline__note { font-family: var(--font-label); font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-gold); }
+.kline--done { opacity: 0.55; }
+.kline--voided .kline__name { text-decoration: line-through; color: var(--text-secondary); }
+
+.ticket__foot { display: flex; gap: var(--space-2); padding: var(--space-3); }
+.ticket__foot .btn { flex: 1; }
+
+.station-hint { font-family: var(--font-label); font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }

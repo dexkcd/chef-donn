@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-scheme="night">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <title>Chef Donn's — Kitchen</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0c0f0d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="../common/tokens.css">
+  <link rel="stylesheet" href="../common/base.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="topbar__title">Kitchen</span>
+    <nav id="stations" class="tabs"></nav>
+    <span class="topbar__spacer"></span>
+    <span id="sync-slot"></span>
+  </header>
+  <div id="banner-slot"></div>
+  <main id="screen" class="screen"></main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" data-scheme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Chef Donn's</title>
+  <meta name="theme-color" content="#f4f1ea">
+  <link rel="icon" href="waiter/icons/icon-192.png">
+  <link rel="stylesheet" href="common/tokens.css">
+  <link rel="stylesheet" href="common/base.css">
+  <style>
+    body { overflow: auto; }
+    .launch { max-width: 720px; margin: 0 auto; padding: var(--space-8) var(--space-4); display: flex; flex-direction: column; gap: var(--space-6); }
+    .wordmark { font-family: var(--font-display); font-weight: 900; font-size: 48px; line-height: 1.05; letter-spacing: -0.01em; }
+    .roles { display: grid; gap: var(--space-4); }
+    .role {
+      display: flex; align-items: center; gap: var(--space-4);
+      min-height: var(--tap-comfortable); padding: var(--space-4);
+      background: var(--surface); border: var(--border-thick) solid var(--border-strong);
+      border-radius: var(--radius-lg); text-decoration: none; color: inherit;
+    }
+    .role img { width: 56px; height: 56px; border-radius: var(--radius-md); }
+    .role__name { font-family: var(--font-display); font-weight: 800; font-size: 22px; }
+    .role__desc { color: var(--text-secondary); font-size: 15px; }
+    .hub-status { display: flex; align-items: center; gap: var(--space-3); }
+  </style>
+</head>
+<body>
+  <main class="launch">
+    <div>
+      <div class="wordmark">Chef Donn's</div>
+      <p class="muted">Pick this device's role. Install it to the home screen — it opens full screen and keeps working if the WiFi drops.</p>
+    </div>
+
+    <nav class="roles">
+      <a class="role" href="waiter/">
+        <img src="waiter/icons/icon-192.png" alt="">
+        <span>
+          <span class="role__name">Waiter</span>
+          <span class="role__desc">Take orders, fire to kitchen, void items</span>
+        </span>
+      </a>
+      <a class="role" href="kitchen/">
+        <img src="kitchen/icons/icon-192.png" alt="">
+        <span>
+          <span class="role__name">Kitchen</span>
+          <span class="role__desc">Station rail, start and bump tickets</span>
+        </span>
+      </a>
+      <a class="role" href="cashier/">
+        <img src="cashier/icons/icon-192.png" alt="">
+        <span>
+          <span class="role__name">Cashier</span>
+          <span class="role__desc">Live running tabs, mark tables billed</span>
+        </span>
+      </a>
+    </nav>
+
+    <div class="hub-status">
+      <span class="sync sync--OFFLINE" id="hub-pill"><span class="sync__dot"></span><span>Checking hub</span></span>
+      <span class="caption" id="hub-detail"></span>
+    </div>
+  </main>
+
+  <script type="module">
+    // Liveness only — this page is a launcher, not an app.
+    const pill = document.getElementById("hub-pill");
+    const detail = document.getElementById("hub-detail");
+    try {
+      const res = await fetch("/healthz", { cache: "no-store" });
+      const { seq } = await res.json();
+      pill.className = "sync sync--ONLINE";
+      pill.lastElementChild.textContent = "Hub online";
+      detail.textContent = `${location.host} · ${seq} events in the log`;
+    } catch {
+      pill.className = "sync sync--OFFLINE";
+      pill.lastElementChild.textContent = "Hub unreachable";
+      detail.textContent = "Check that the hub PC is on and this device is on the restaurant WiFi.";
+    }
+  </script>
+</body>
+</html>

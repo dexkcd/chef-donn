@@ -1,0 +1,27 @@
+# Chef Donn's hub — one container on the restaurant's PC.
+#
+#   docker compose up -d
+#
+# Then the tablets open http://<that-pc's-LAN-IP>:8577/ and install the app for
+# their role to the home screen. Nothing else to configure.
+
+services:
+  hub:
+    build: .
+    image: chefdonn/hub:2.0.0
+    container_name: chefdonn-hub
+    # Comes back after a Windows reboot or a power cut without anyone touching it.
+    restart: unless-stopped
+    ports:
+      - "8577:8577"
+    volumes:
+      # Named volume, not a bind mount: SQLite's WAL needs real file locking,
+      # which a Windows host-mounted directory does not reliably provide.
+      - hub-data:/data
+    environment:
+      CHEFDONN_HUB_NAME: "Chef Donn's Hub"
+      # TZ keeps event timestamps and ticket ages in local restaurant time.
+      TZ: "Asia/Manila"
+
+volumes:
+  hub-data:
