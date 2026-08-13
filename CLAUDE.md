@@ -10,11 +10,12 @@ add POS features — they are explicitly out of scope until Module 3.
 
 ## Toolchain
 
-Node ≥22.5 (the event log uses built-in `node:sqlite`) and Docker. One runtime
-dependency, `ws`. No build step, no bundler, no transpiler — do not add one.
+Node ≥22.5 (the event log uses built-in `node:sqlite`), `openssl` on PATH, and
+Docker. One runtime dependency, `ws`. No build step, no bundler, no transpiler —
+do not add one.
 
-- `npm start` — serve on :8577
-- `npm test` — domain, engine, web, and real-socket integration tests
+- `npm start` — apps on https://localhost:8443, cert setup on http://localhost:8577
+- `npm test` — domain, engine, web, TLS, and real-socket integration tests
 - `docker compose up -d` — how it actually runs in the restaurant
 
 ## Architecture invariants
@@ -52,6 +53,15 @@ restaurant has no internet during service. Icons regenerate with
 
 ## PWA specifics
 
+- **HTTPS is load-bearing, not hardening.** Service workers exist only in a
+  secure context; at `http://<lan-ip>` `navigator.serviceWorker` is undefined,
+  so no install and no offline start. The hub is its own CA (`server/src/certs.js`),
+  tablets enroll once via the HTTP setup page (`server/src/enroll.js`).
+- CA is long-lived; the server cert is 397 days (Safari rejects >398) and
+  auto-reissues on expiry or LAN-address change. Never make a change that
+  forces re-enrollment — reissuing the leaf must not touch the CA.
+- The setup page must stay self-contained (inline CSS, system fonts): it is
+  loaded by a device that does not yet trust the HTTPS origin.
 - Each app owns `manifest.webmanifest` + `sw.js`; shared SW logic is in
   `web/common/sw-core.js` (stale-while-revalidate app shell).
 - Bump the `cacheName` in an app's `sw.js` when its shell assets change, or

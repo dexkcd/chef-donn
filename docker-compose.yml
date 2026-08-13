@@ -2,8 +2,13 @@
 #
 #   docker compose up -d
 #
-# Then the tablets open http://<that-pc's-LAN-IP>:8577/ and install the app for
-# their role to the home screen. Nothing else to configure.
+# Then, once per tablet, open http://<that-pc's-LAN-IP>:8577/ and follow the
+# setup page: it installs the hub's certificate, after which the apps live at
+# https://<that-pc's-LAN-IP>:8443/ and can be added to the home screen.
+#
+# The HTTPS port is not decoration. Browsers only provide service workers on a
+# secure origin, and without one the apps cannot be installed and cannot open
+# while the WiFi is down.
 
 services:
   hub:
@@ -13,10 +18,13 @@ services:
     # Comes back after a Windows reboot or a power cut without anyone touching it.
     restart: unless-stopped
     ports:
-      - "8577:8577"
+      - "8443:8443" # the apps
+      - "8577:8577" # first-run certificate setup
     volumes:
       # Named volume, not a bind mount: SQLite's WAL needs real file locking,
       # which a Windows host-mounted directory does not reliably provide.
+      # This volume also holds the hub's CA — destroy it and every tablet has
+      # to install a new certificate.
       - hub-data:/data
     environment:
       CHEFDONN_HUB_NAME: "Chef Donn's Hub"

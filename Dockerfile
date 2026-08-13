@@ -5,6 +5,11 @@
 # the image needs no compiler and no native module rebuild on any platform.
 FROM node:22-alpine
 
+# openssl issues the hub's own CA and server certificate on first boot. The
+# apps must be served over HTTPS or browsers withhold service workers, and
+# without those the tablets cannot install the apps or open them offline.
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Only `ws` is a real dependency; installing before the source copy keeps the
@@ -18,16 +23,20 @@ COPY web/ ./web/
 
 ENV NODE_ENV=production \
     CHEFDONN_PORT=8577 \
+    CHEFDONN_HTTPS_PORT=8443 \
     CHEFDONN_DATA=/data
 
-# The order log lives here. Mount it — losing this volume loses the day's
-# service history, which is the one thing this system must never do.
+# The order log AND the hub's certificate authority live here. Mount it —
+# losing this volume loses the day's service history, and forces every tablet
+# to install a new certificate.
 VOLUME ["/data"]
-EXPOSE 8577
+EXPOSE 8443 8577
 
 # Service is unusable if the hub is down, so let Docker see failures and
-# restart rather than leave the tablets staring at a dead screen.
-HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.CHEFDONN_PORT||8577)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# restart rather than leave the tablets staring at a dead screen. Verified
+# against the hub's own CA rather than skipping verification, so a broken
+# certificate registers as the outage it is.
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "const https=require('https'),fs=require('fs');https.get({host:'127.0.0.1',port:process.env.CHEFDONN_HTTPS_PORT||8443,path:'/healthz',ca:fs.readFileSync(process.env.CHEFDONN_DATA+'/tls/ca.crt')},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["node", "server/src/main.js"]

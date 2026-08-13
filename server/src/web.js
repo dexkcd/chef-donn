@@ -1,9 +1,14 @@
-// One HTTP server does everything: serves the three PWAs (static files from
-// web/ plus the shared domain modules under /shared/) and upgrades /ws to the
-// event-stream WebSocket. No framework — a careful 60-line static handler and
-// `ws` are the whole surface.
+// One server does everything: serves the three PWAs (static files from web/
+// plus the shared domain modules under /shared/) and upgrades /ws to the
+// event-stream WebSocket. No framework — a careful static handler and `ws` are
+// the whole surface.
+//
+// Given TLS material it serves HTTPS, which is not cosmetic: browsers only
+// expose service workers in a secure context, so without it the apps cannot be
+// installed and cannot open offline.
 
 import http from "node:http";
+import https from "node:https";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { WebSocketServer } from "ws";
@@ -28,8 +33,8 @@ function resolveSafe(root, urlPath) {
   return resolved.startsWith(root + path.sep) || resolved === root ? resolved : null;
 }
 
-export function createWebServer({ engine, webDir, sharedDir, hubName = "Chef Donn's Hub" }) {
-  const server = http.createServer(async (req, res) => {
+export function createWebServer({ engine, webDir, sharedDir, hubName = "Chef Donn's Hub", tls = null }) {
+  const handler = async (req, res) => {
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405).end();
       return;
@@ -77,7 +82,11 @@ export function createWebServer({ engine, webDir, sharedDir, hubName = "Chef Don
         res.writeHead(404, { "content-type": "text/plain" }).end("Not found");
       }
     }
-  });
+  };
+
+  const server = tls
+    ? https.createServer({ key: tls.key, cert: tls.cert }, handler)
+    : http.createServer(handler);
 
   const wss = new WebSocketServer({ server, path: WS_PATH });
 

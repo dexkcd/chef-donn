@@ -9,9 +9,16 @@ the existing POS: **add tablets, remove paper.**
 - **Cashier** (tablet, read-only) — live running tab per table, one action: Mark Billed
 
 All three are progressive web apps served off one small Node server that runs in
-Docker on any PC in the restaurant. Staff open the server's address once, install
-the app for their role to the home screen, and it behaves like a native app —
-full screen, no browser chrome, working when the WiFi drops.
+Docker on any PC in the restaurant. Staff install the app for their role to the
+home screen once, and it behaves like a native app — full screen, no browser
+chrome, working when the WiFi drops.
+
+That last part is why the hub serves HTTPS. Browsers only expose service
+workers on a secure origin, and a plain `http://192.168.x.x` address is not
+one — no service worker means no home-screen install and a blank screen the
+moment a tablet reloads off-mesh. Since the restaurant has no internet during
+service, the hub is its own certificate authority: each device installs its
+certificate once during setup, and never again.
 
 No payments, no receipts, no discounts, no split bills, no BIR CAS, no cloud
 during service.
@@ -36,7 +43,9 @@ no bundler, and no transpiler anywhere in this repo.
 | `shared/decide.js` | Commands and `decide` — the only place a write is validated |
 | `shared/protocol.js` | WebSocket messages (Hello / Submit / Welcome / Events / Ack) |
 | `shared/client.js` | Sync engine: pending queue, catch-up, reconnect |
-| `server/src/` | Event log (`node:sqlite`), engine, HTTP + WebSocket server |
+| `server/src/` | Event log (`node:sqlite`), engine, HTTPS + WebSocket server |
+| `server/src/certs.js` | The hub's own CA and its auto-rotating server certificate |
+| `server/src/enroll.js` | HTTP setup page that gets the CA onto a tablet |
 | `web/waiter`, `web/kitchen`, `web/cashier` | The three PWAs |
 | `web/common`, `web/fonts` | Design-system CSS, shared UI helpers, service worker, fonts |
 
@@ -48,29 +57,50 @@ Requires Docker. On the restaurant's PC:
 docker compose up -d
 ```
 
-Then find that PC's LAN address (`ipconfig` on Windows) and open
-`http://<that-address>:8577/` on each tablet. Pick the role, then use the
-browser's **Install app** / **Add to Home Screen**.
-
-The server prints the URLs staff should use when it starts:
+Find that PC's LAN address (`ipconfig` on Windows) — or just read it off the
+startup log, which prints every address staff can use:
 
 ```
 docker compose logs hub
 ```
 
-The order log lives in the `hub-data` Docker volume. It is the restaurant's
-service history — back it up, don't delete it.
+### Setting up a tablet (once per device)
+
+1. Open `http://<that-address>:8577/` — the setup page.
+2. Tap **Download the certificate**, then install it. The page has the exact
+   taps for Android, iPad, and Windows.
+   - **iPad/iPhone:** after installing, you must also switch on full trust in
+     Settings → General → About → Certificate Trust Settings. Safari refuses
+     the hub until you do.
+3. Open `https://<that-address>:8443/`, pick the role, and use the browser's
+   **Install app** / **Add to Home Screen**.
+
+From then on staff just tap the home-screen icon. The old HTTP address keeps
+working as a redirect, so a stale bookmark still lands in the right place.
+
+The `hub-data` Docker volume holds both the order log and the hub's certificate
+authority. It is the restaurant's service history — back it up, don't delete it.
+Deleting it also means every tablet has to install a new certificate.
+
+### Certificate renewal
+
+Nothing to do. The certificate authority lasts ten years; the server
+certificate it signs lasts 397 days (Safari rejects anything longer) and the
+hub reissues it automatically within 30 days of expiry, and whenever the PC's
+LAN address changes. Because reissuing never touches the CA, tablets keep
+working across it without re-enrolling.
 
 ### Windows notes
 
 Docker Desktop with the WSL2 backend is the tested setup. Two things matter:
 
-- **Let port 8577 through Windows Firewall**, or tablets on the same WiFi can't
-  reach the hub. Docker Desktop usually prompts on first run; if it didn't,
-  add an inbound rule for TCP 8577 on the Private profile.
+- **Let ports 8443 and 8577 through Windows Firewall**, or tablets on the same
+  WiFi can't reach the hub. Docker Desktop usually prompts on first run; if it
+  didn't, add inbound rules for TCP 8443 and 8577 on the Private profile.
 - **The PC needs a stable LAN address.** A DHCP reservation on the router is the
   low-effort option; otherwise every reboot can move the hub and the staff's
-  home-screen shortcuts break.
+  home-screen shortcuts break. (The hub reissues its certificate for a new
+  address automatically, so this costs a re-bookmark, not a re-enrollment.)
 
 The compose file uses a named volume rather than a bind mount on purpose:
 SQLite's write-ahead log needs real file locking, which host-mounted Windows
@@ -78,13 +108,21 @@ directories do not reliably provide.
 
 ## Development
 
-Requires Node 22.5 or newer (the event log uses the built-in `node:sqlite`).
+Requires Node 22.5 or newer (the event log uses the built-in `node:sqlite`) and
+`openssl` on PATH for certificate issuance.
 
 ```bash
 npm install
-npm start        # http://localhost:8577
-npm test         # 40 tests: domain rules, engine, real-socket integration
+npm start        # apps on https://localhost:8443, setup on http://localhost:8577
+npm test         # 49 tests: domain rules, engine, TLS, real-socket integration
+
+CHEFDONN_INSECURE=1 npm start   # plain HTTP on 8577, no TLS
 ```
+
+`CHEFDONN_INSECURE=1` is for development only. `http://localhost` happens to be
+a secure context, so service workers still work there — but the same build on a
+LAN address silently loses installability and offline start, which is the whole
+reason the certificate machinery exists.
 
 `npm start` seeds a sample Filipino menu and tables T1–T10 the first time it runs
 against an empty log.
