@@ -2,8 +2,9 @@ package ph.chefdonn.domain
 
 import kotlinx.serialization.Serializable
 
+/** OFFICE is the back-office role (expense receipts); it never touches orders. */
 @Serializable
-enum class Role { WAITER, KITCHEN, CASHIER, HUB }
+enum class Role { WAITER, KITCHEN, CASHIER, HUB, OFFICE }
 
 /**
  * QUEUED → COOKING → READY → SERVED, forward-only (jumps allowed, e.g. a direct
@@ -72,15 +73,59 @@ data class Order(
     val totalCents: Long get() = lines.sumOf { it.amountCents }
 }
 
+/**
+ * Bucket for expense receipts. Receipts reference a category by id, so a rename
+ * applies everywhere; a category with receipts is archived, never removed.
+ */
+@Serializable
+data class ExpenseCategory(
+    val id: String,
+    val name: String,
+    val archived: Boolean = false,
+)
+
+/**
+ * What the user filed for one expense receipt. receiptId and photoIds are
+ * client-generated UUIDs; the photos themselves live in the hub's photo store,
+ * not in the event log.
+ */
+@Serializable
+data class ReceiptSpec(
+    val receiptId: String,
+    val vendor: String,
+    /** Centavos, never floating-point pesos. */
+    val totalCents: Long,
+    /** Calendar date printed on the receipt, ISO-8601 (yyyy-MM-dd). */
+    val purchasedOn: String,
+    val categoryId: String,
+    val photoIds: List<String> = emptyList(),
+    val note: String = "",
+)
+
+@Serializable
+data class Receipt(
+    val spec: ReceiptSpec,
+    val recordedBy: String,
+    val recordedAt: Long,
+    val updatedAt: Long,
+    val deleted: Boolean = false,
+    val deletedReason: String? = null,
+)
+
 @Serializable
 data class AppState(
     val menu: List<MenuItem> = emptyList(),
     val tables: List<TableInfo> = emptyList(),
     val orders: Map<String, Order> = emptyMap(),
+    val expenseCategories: List<ExpenseCategory> = emptyList(),
+    val receipts: Map<String, Receipt> = emptyMap(),
 ) {
     fun openOrderForTable(tableId: String): Order? =
         orders.values.firstOrNull { it.tableId == tableId && !it.billed }
 
     fun line(orderId: String, lineId: String): OrderLine? =
         orders[orderId]?.lines?.firstOrNull { it.spec.lineId == lineId }
+
+    fun expenseCategory(id: String): ExpenseCategory? =
+        expenseCategories.firstOrNull { it.id == id }
 }

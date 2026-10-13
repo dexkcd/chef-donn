@@ -75,6 +75,38 @@ data class TablesUpdated(
     override val at: Long,
 ) : DomainEvent
 
+@Serializable
+@SerialName("ReceiptRecorded")
+data class ReceiptRecorded(
+    val receipt: ReceiptSpec,
+    val recordedBy: String,
+    override val at: Long,
+) : DomainEvent
+
+@Serializable
+@SerialName("ReceiptEdited")
+data class ReceiptEdited(
+    val receipt: ReceiptSpec,
+    val editedBy: String,
+    override val at: Long,
+) : DomainEvent
+
+@Serializable
+@SerialName("ReceiptDeleted")
+data class ReceiptDeleted(
+    val receiptId: String,
+    val reason: String,
+    val deletedBy: String,
+    override val at: Long,
+) : DomainEvent
+
+@Serializable
+@SerialName("ExpenseCategoriesUpdated")
+data class ExpenseCategoriesUpdated(
+    val categories: List<ExpenseCategory>,
+    override val at: Long,
+) : DomainEvent
+
 /** Pure fold. Must stay deterministic: hub and every client run the same function. */
 fun reduce(state: AppState, event: DomainEvent): AppState = when (event) {
     is OrderOpened -> state.copy(
@@ -123,6 +155,38 @@ fun reduce(state: AppState, event: DomainEvent): AppState = when (event) {
     is MenuUpdated -> state.copy(menu = event.items)
 
     is TablesUpdated -> state.copy(tables = event.tables)
+
+    // First write wins, mirroring LinesAdded: a re-recorded id never clobbers edits.
+    is ReceiptRecorded -> if (event.receipt.receiptId in state.receipts) state else state.copy(
+        receipts = state.receipts + (event.receipt.receiptId to Receipt(
+            spec = event.receipt,
+            recordedBy = event.recordedBy,
+            recordedAt = event.at,
+            updatedAt = event.at,
+        )),
+    )
+
+    is ReceiptEdited -> state.updateReceipt(event.receipt.receiptId) {
+        it.copy(spec = event.receipt, updatedAt = event.at)
+    }
+
+    is ReceiptDeleted -> state.updateReceipt(event.receiptId) {
+        it.copy(deleted = true, deletedReason = event.reason, updatedAt = event.at)
+    }
+
+    is ExpenseCategoriesUpdated -> state.copy(expenseCategories = event.categories)
+}
+
+/**
+ * Which device roles the hub streams this event to. Expense data stays off the
+ * service devices. Exhaustive on purpose: every new event has to pick a side.
+ */
+fun DomainEvent.visibleTo(role: Role): Boolean = when (this) {
+    is OrderOpened, is LinesAdded, is LineStatusSet, is LineVoided, is OrderBilled,
+    is MenuUpdated, is TablesUpdated -> true
+
+    is ReceiptRecorded, is ReceiptEdited, is ReceiptDeleted,
+    is ExpenseCategoriesUpdated -> role == Role.OFFICE || role == Role.HUB
 }
 
 fun reduceAll(state: AppState, events: List<DomainEvent>): AppState =
@@ -136,6 +200,11 @@ fun LineStatus.canAdvanceTo(target: LineStatus): Boolean =
 /** Void allowed any time before the plate reaches the guest. */
 val LineStatus.canBeVoided: Boolean
     get() = this != LineStatus.SERVED && this != LineStatus.VOIDED
+
+private inline fun AppState.updateReceipt(receiptId: String, f: (Receipt) -> Receipt): AppState {
+    val receipt = receipts[receiptId] ?: return this
+    return copy(receipts = receipts + (receiptId to f(receipt)))
+}
 
 private inline fun AppState.updateOrder(orderId: String, f: (Order) -> Order): AppState {
     val order = orders[orderId] ?: return this

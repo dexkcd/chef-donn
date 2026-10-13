@@ -1,17 +1,26 @@
 package ph.chefdonn.hubserver
 
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.request.receiveChannel
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
+import io.ktor.utils.io.core.readBytes
+import io.ktor.utils.io.readRemaining
 import io.ktor.websocket.readText
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +30,15 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import ph.chefdonn.protocol.ClientMessage
 import ph.chefdonn.protocol.EventEnvelope
+import ph.chefdonn.protocol.MAX_PHOTO_BYTES
+import ph.chefdonn.protocol.PHOTO_PATH
 import ph.chefdonn.protocol.ServerMessage
 import ph.chefdonn.protocol.WS_PATH
 import ph.chefdonn.protocol.decodeClientMessage
 import ph.chefdonn.protocol.encode
+import ph.chefdonn.protocol.isValidPhotoId
 import ph.chefdonn.domain.Role
+import ph.chefdonn.domain.visibleTo
 
 @Serializable
 data class ConnectedDevice(
@@ -48,10 +61,42 @@ class SessionRegistry {
     }
 }
 
-fun Application.hubModule(engine: HubEngine, hubName: String, registry: SessionRegistry) {
+fun Application.hubModule(engine: HubEngine, hubName: String, registry: SessionRegistry, photos: PhotoStore) {
     install(WebSockets)
     routing {
         get("/health") { call.respondText("chef-donn-hub") }
+
+        put("$PHOTO_PATH/{id}") {
+            val id = call.parameters["id"].orEmpty()
+            if (!isValidPhotoId(id)) {
+                return@put call.respondText("Bad photo id", status = HttpStatusCode.BadRequest)
+            }
+            val declared = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+            if (declared != null && declared > MAX_PHOTO_BYTES) {
+                return@put call.respondText("Photo too large", status = HttpStatusCode.PayloadTooLarge)
+            }
+            val packet = call.receiveChannel().readRemaining(MAX_PHOTO_BYTES + 1L)
+            if (packet.remaining > MAX_PHOTO_BYTES) {
+                packet.release()
+                return@put call.respondText("Photo too large", status = HttpStatusCode.PayloadTooLarge)
+            }
+            val bytes = packet.readBytes()
+            if (bytes.size < 3 || bytes[0] != 0xFF.toByte() || bytes[1] != 0xD8.toByte()) {
+                return@put call.respondText("JPEG only", status = HttpStatusCode.UnsupportedMediaType)
+            }
+            photos.write(id, bytes)
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        get("$PHOTO_PATH/{id}") {
+            val id = call.parameters["id"].orEmpty()
+            if (!isValidPhotoId(id)) {
+                return@get call.respondText("Bad photo id", status = HttpStatusCode.BadRequest)
+            }
+            val bytes = photos.read(id)
+                ?: return@get call.respondText("No such photo", status = HttpStatusCode.NotFound)
+            call.respondBytes(bytes, ContentType.Image.JPEG)
+        }
 
         webSocket(WS_PATH) {
             val helloFrame = incoming.receive() as? Frame.Text ?: return@webSocket
@@ -67,8 +112,10 @@ fun Application.hubModule(engine: HubEngine, hubName: String, registry: SessionR
                     engine.broadcasts.collect { live.send(it) }
                 }
 
+                // Each role only receives the events it may see (no expense data on
+                // service devices). The cursor still covers the skipped seqs.
                 val catchUp = engine.eventsSince(hello.lastSeenSeq)
-                catchUp.chunked(200).forEach { chunk ->
+                catchUp.filter { it.event.visibleTo(hello.role) }.chunked(200).forEach { chunk ->
                     send(Frame.Text(ServerMessage.Events(chunk).encode()))
                 }
                 var lastSent = maxOf(hello.lastSeenSeq, catchUp.lastOrNull()?.seq ?: 0)
@@ -76,7 +123,9 @@ fun Application.hubModule(engine: HubEngine, hubName: String, registry: SessionR
                 val forwarder = launch {
                     for (env in live) {
                         if (env.seq > lastSent) {
-                            send(Frame.Text(ServerMessage.Events(listOf(env)).encode()))
+                            if (env.event.visibleTo(hello.role)) {
+                                send(Frame.Text(ServerMessage.Events(listOf(env)).encode()))
+                            }
                             lastSent = env.seq
                         }
                     }
@@ -108,8 +157,9 @@ fun startHubServer(
     engine: HubEngine,
     port: Int,
     hubName: String,
+    photos: PhotoStore,
     registry: SessionRegistry = SessionRegistry(),
 ): ApplicationEngine =
     embeddedServer(CIO, port = port) {
-        hubModule(engine, hubName, registry)
+        hubModule(engine, hubName, registry, photos)
     }.start(wait = false)

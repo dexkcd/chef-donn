@@ -2,6 +2,8 @@ package ph.chefdonn.domain
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 /**
  * Commands are client intents. Ids (commandId, orderId, lineId) are client-generated
@@ -88,6 +90,45 @@ data class UpdateTables(
     val tables: List<TableInfo>,
 ) : Command
 
+@Serializable
+@SerialName("RecordReceipt")
+data class RecordReceipt(
+    override val commandId: String,
+    override val deviceId: String,
+    override val actor: String,
+    val receipt: ReceiptSpec,
+) : Command
+
+/** Replaces every field of an existing receipt (re-categorize, fix an OCR misread). */
+@Serializable
+@SerialName("EditReceipt")
+data class EditReceipt(
+    override val commandId: String,
+    override val deviceId: String,
+    override val actor: String,
+    val receipt: ReceiptSpec,
+) : Command
+
+@Serializable
+@SerialName("DeleteReceipt")
+data class DeleteReceipt(
+    override val commandId: String,
+    override val deviceId: String,
+    override val actor: String,
+    val receiptId: String,
+    val reason: String,
+) : Command
+
+/** Whole-list replace, like [UpdateMenu]. Archive a category instead of dropping it. */
+@Serializable
+@SerialName("UpdateExpenseCategories")
+data class UpdateExpenseCategories(
+    override val commandId: String,
+    override val deviceId: String,
+    override val actor: String,
+    val categories: List<ExpenseCategory>,
+) : Command
+
 sealed interface Decision {
     data class Accepted(val events: List<DomainEvent>) : Decision
     /** The command could not apply. Never silent: the hub reports this back to the sender. */
@@ -171,4 +212,67 @@ fun decide(state: AppState, cmd: Command, now: Long): Decision = when (cmd) {
     is UpdateMenu -> Decision.Accepted(listOf(MenuUpdated(cmd.items, now)))
 
     is UpdateTables -> Decision.Accepted(listOf(TablesUpdated(cmd.tables, now)))
+    is RecordReceipt -> when {
+        cmd.receipt.receiptId in state.receipts -> Decision.Rejected("Receipt already recorded")
+        else -> receiptProblem(state, cmd.receipt, keepCategoryId = null)
+            ?.let { Decision.Rejected(it) }
+            ?: Decision.Accepted(listOf(ReceiptRecorded(cmd.receipt, cmd.actor, now)))
+    }
+
+    is EditReceipt -> {
+        val existing = state.receipts[cmd.receipt.receiptId]
+        when {
+            existing == null -> Decision.Rejected("Receipt not found")
+            existing.deleted -> Decision.Rejected("Receipt was deleted")
+            else -> receiptProblem(state, cmd.receipt, keepCategoryId = existing.spec.categoryId)
+                ?.let { Decision.Rejected(it) }
+                ?: Decision.Accepted(listOf(ReceiptEdited(cmd.receipt, cmd.actor, now)))
+        }
+    }
+
+    is DeleteReceipt -> {
+        val existing = state.receipts[cmd.receiptId]
+        when {
+            existing == null -> Decision.Rejected("Receipt not found")
+            existing.deleted -> Decision.Accepted(emptyList()) // idempotent: already deleted
+            else -> Decision.Accepted(listOf(ReceiptDeleted(cmd.receiptId, cmd.reason, cmd.actor, now)))
+        }
+    }
+
+    is UpdateExpenseCategories -> {
+        val ids = cmd.categories.map { it.id }
+        val activeNames = cmd.categories.filter { !it.archived }.map { it.name.trim().lowercase() }
+        val inUse = state.receipts.values.map { it.spec.categoryId }.toSet()
+        val dropped = state.expenseCategories.filter { it.id !in ids && it.id in inUse }
+        when {
+            cmd.categories.any { it.id.isBlank() || it.name.isBlank() } -> Decision.Rejected("Every category needs a name")
+            ids.size != ids.toSet().size -> Decision.Rejected("Duplicate category id")
+            activeNames.size != activeNames.toSet().size -> Decision.Rejected("Two categories have the same name")
+            dropped.isNotEmpty() -> Decision.Rejected("${dropped.first().name} has receipts — archive it instead")
+            else -> Decision.Accepted(listOf(ExpenseCategoriesUpdated(cmd.categories, now)))
+        }
+    }
+}
+
+/**
+ * Why a receipt can't be filed, or null if it can. [keepCategoryId] lets an edit
+ * keep a category that was archived after the receipt was recorded.
+ */
+private fun receiptProblem(state: AppState, spec: ReceiptSpec, keepCategoryId: String?): String? {
+    val category = state.expenseCategory(spec.categoryId)
+    return when {
+        spec.vendor.isBlank() -> "Vendor is required"
+        spec.totalCents <= 0 -> "Total must be more than ₱0.00"
+        !isIsoDate(spec.purchasedOn) -> "Date must look like 2026-10-12"
+        category == null -> "Category not found"
+        category.archived && category.id != keepCategoryId -> "${category.name} is archived — pick another category"
+        else -> null
+    }
+}
+
+private fun isIsoDate(s: String): Boolean = try {
+    LocalDate.parse(s)
+    true
+} catch (_: DateTimeParseException) {
+    false
 }

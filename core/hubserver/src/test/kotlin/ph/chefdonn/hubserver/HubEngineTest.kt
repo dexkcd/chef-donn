@@ -4,6 +4,10 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import kotlinx.coroutines.test.runTest
 import ph.chefdonn.domain.AddLines
 import ph.chefdonn.domain.BillOrder
+import ph.chefdonn.domain.ExpenseCategory
+import ph.chefdonn.domain.RecordReceipt
+import ph.chefdonn.domain.ReceiptSpec
+import ph.chefdonn.domain.UpdateExpenseCategories
 import ph.chefdonn.domain.FireOrder
 import ph.chefdonn.domain.LineSpec
 import ph.chefdonn.domain.LineStatus
@@ -98,5 +102,19 @@ class HubEngineTest {
         val ack = engine.submit(AddLines("c3", "dev1", "Ana", "o1", listOf(testSpec())))
         assertFalse(ack.accepted)
         assertTrue(ack.reason!!.contains("billed"))
+    }
+
+    @Test
+    fun `receipts and categories survive engine restart`() = runTest {
+        val path = Files.createTempDirectory("hub").resolve("hub.db").toString()
+        val receipt = ReceiptSpec("r1", "Petron", 187435, "2026-10-09", "cat-fuel", listOf(UUID.randomUUID().toString()))
+        run {
+            val engine = HubEngine(fileDb(path))
+            assertTrue(engine.submit(UpdateExpenseCategories("c1", "hub", "Hub", listOf(ExpenseCategory("cat-fuel", "LPG & Fuel")))).accepted)
+            assertTrue(engine.submit(RecordReceipt("c2", "tab", "Marites", receipt)).accepted)
+        }
+        val reborn = HubEngine(fileDb(path))
+        assertEquals(receipt, reborn.state.value.receipts.getValue("r1").spec)
+        assertEquals("LPG & Fuel", reborn.state.value.expenseCategory("cat-fuel")!!.name)
     }
 }

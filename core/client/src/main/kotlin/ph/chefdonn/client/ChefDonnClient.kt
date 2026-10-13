@@ -41,6 +41,7 @@ enum class SyncState {
 /**
  * Where unsynced commands and the sync cursor live. In-memory by default; the staff
  * app supplies a disk-backed store so a queued void survives an app kill (M3).
+ * The cursor is saved but not resumed from until client state is persisted too.
  */
 interface PendingStore {
     fun loadPending(): List<Command>
@@ -85,6 +86,10 @@ class ChefDonnClient(
     private val _pendingCount = MutableStateFlow(0)
     val pendingCount: StateFlow<Int> = _pendingCount.asStateFlow()
 
+    private val _pendingCommands = MutableStateFlow<List<Command>>(emptyList())
+    /** Commands queued but not yet acked, oldest first — lets screens show "QUEUED" work. */
+    val pendingCommands: StateFlow<List<Command>> = _pendingCommands.asStateFlow()
+
     private val _sync = MutableStateFlow(SyncState.OFFLINE)
     val sync: StateFlow<SyncState> = _sync.asStateFlow()
 
@@ -101,8 +106,11 @@ class ChefDonnClient(
 
     init {
         store.loadPending().forEach { pending[it.commandId] = it }
-        lastSeenSeq = store.loadLastSeenSeq()
-        _pendingCount.value = pending.size
+        // State lives only in memory, so a cold start must replay the stream from the
+        // beginning; resuming from the stored cursor would leave the menu (and every
+        // earlier event) missing after an app restart or a role change.
+        lastSeenSeq = 0
+        publishPending()
         refreshDisconnectedSyncState()
     }
 
@@ -152,7 +160,7 @@ class ChefDonnClient(
         mutex.withLock {
             pending[command.commandId] = command
             store.addPending(command)
-            _pendingCount.value = pending.size
+            publishPending()
         }
         if (_sync.value != SyncState.ONLINE) refreshDisconnectedSyncState()
         wakeSender.trySend(Unit)
@@ -181,11 +189,16 @@ class ChefDonnClient(
                 mutex.withLock {
                     pending.remove(msg.commandId)
                     store.removePending(msg.commandId)
-                    _pendingCount.value = pending.size
+                    publishPending()
                 }
                 _acks.emit(msg)
             }
         }
+    }
+
+    private fun publishPending() {
+        _pendingCommands.value = pending.values.toList()
+        _pendingCount.value = pending.size
     }
 
     private fun markDisconnected() {

@@ -11,6 +11,19 @@ const val WS_PATH = "/ws"
 const val DEFAULT_HUB_PORT = 8577
 const val NSD_SERVICE_TYPE = "_chefdonn._tcp"
 
+/**
+ * Receipt photos travel over plain HTTP beside the WebSocket: PUT/GET
+ * `$PHOTO_PATH/{photoId}`, JPEG bytes. Ids are client-generated UUIDs, so an upload
+ * retried after a dropped connection is idempotent.
+ */
+const val PHOTO_PATH = "/photos"
+const val MAX_PHOTO_BYTES = 8 * 1024 * 1024
+
+private val PHOTO_ID = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+/** Only UUIDs: the id becomes a file name on the hub, so nothing path-like gets through. */
+fun isValidPhotoId(id: String): Boolean = PHOTO_ID.matches(id)
+
 /** An event with its hub-assigned position in the log. seq is the sync cursor. */
 @Serializable
 data class EventEnvelope(
