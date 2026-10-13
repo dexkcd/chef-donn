@@ -2,8 +2,12 @@
 
 Three-app restaurant ticketing (waiter / kitchen KDS / cashier) + Android hub.
 Product spec v2 rules: cashier is read-only + Mark Billed only; NO payments,
-discounts, split bills, receipts, BIR features, or cloud-during-service. Do not add
-POS features — they are explicitly out of scope until Module 3.
+discounts, split bills, customer receipts, BIR features, or cloud-during-service. Do not
+add POS features — they are explicitly out of scope until Module 3.
+
+Expense receipts ARE in scope (back office, `Role.OFFICE`, `feature/receipts`): photos +
+OCR + categories + month totals. Keep them bookkeeping-only — no VAT/TIN capture or BIR
+reporting.
 
 ## Toolchain (user-local, no sudo)
 
@@ -23,6 +27,11 @@ POS features — they are explicitly out of scope until Module 3.
   at order time — menu edits must not change fired tickets.
 - Line status: QUEUED → COOKING → READY → SERVED forward-only (jumps ok);
   VOIDED terminal, only pre-SERVED.
+- Receipt photos are blobs outside the log: hub `FilePhotoStore`, `PUT/GET /photos/{uuid}`,
+  write-once; events reference them by client UUID. Receipts are soft-deleted; categories
+  in use are archived, never dropped.
+- `DomainEvent.visibleTo(role)` decides which roles a hub streams an event to (expense
+  events: OFFICE/HUB only). It is exhaustive on purpose — every new event picks a side.
 
 ## Design system
 
@@ -36,6 +45,8 @@ display/buttons, Barlow body, Barlow Condensed labels, IBM Plex Mono for all num
 ## Testing
 
 - `./gradlew :core:domain:test` — reducer/decide rules
+- `./gradlew :core:receipts:test` — OCR text parser, category suggester, month totals
 - `./gradlew :core:hubserver:test` — includes real-socket integration tests
-  (3 role clients, void-beats-bump, hub restart replay, offline queue drain)
+  (3 role clients, void-beats-bump, hub restart replay, offline queue drain,
+  receipt photos up/down, expense events filtered from service roles)
 - Integration test fns need `(): Unit = runBlocking` (JUnit4 void check)

@@ -11,6 +11,7 @@ import android.net.nsd.NsdServiceInfo
 import android.os.IBinder
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import io.ktor.server.engine.ApplicationEngine
+import ph.chefdonn.hubserver.FilePhotoStore
 import ph.chefdonn.hubserver.HubEngine
 import ph.chefdonn.hubserver.SessionRegistry
 import ph.chefdonn.hubserver.db.HubDatabase
@@ -18,6 +19,7 @@ import ph.chefdonn.hubserver.hubDatabase
 import ph.chefdonn.hubserver.startHubServer
 import ph.chefdonn.protocol.DEFAULT_HUB_PORT
 import ph.chefdonn.protocol.NSD_SERVICE_TYPE
+import java.io.File
 
 /**
  * Process-wide handle to the running engine. The admin UI talks to the engine
@@ -49,7 +51,9 @@ class HubService : Service() {
         val registry = SessionRegistry()
         HubRuntime.engine = engine
         HubRuntime.registry = registry
-        server = startHubServer(engine, DEFAULT_HUB_PORT, "Chef Donn's Hub", registry)
+        // Receipt photos live beside the event log db, in app-private storage.
+        val photos = FilePhotoStore(File(filesDir, "receipt-photos"))
+        server = startHubServer(engine, DEFAULT_HUB_PORT, "Chef Donn's Hub", photos, registry)
         registerNsd()
     }
 

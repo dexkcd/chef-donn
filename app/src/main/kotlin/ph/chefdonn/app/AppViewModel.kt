@@ -15,10 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ph.chefdonn.client.ChefDonnClient
+import ph.chefdonn.client.DirectoryPhotoOutbox
+import ph.chefdonn.client.PhotoSync
 import ph.chefdonn.domain.Command
 import ph.chefdonn.domain.Role
 import ph.chefdonn.protocol.DEFAULT_HUB_PORT
 import ph.chefdonn.protocol.NSD_SERVICE_TYPE
+import java.io.File
 import java.util.UUID
 
 private val Context.dataStore by preferencesDataStore("chefdonn")
@@ -47,6 +50,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _client = MutableStateFlow<ChefDonnClient?>(null)
     val client: StateFlow<ChefDonnClient?> = _client.asStateFlow()
+
+    private val _photoSync = MutableStateFlow<PhotoSync?>(null)
+    /** Receipt photo upload/fetch — only the Office role has one. */
+    val photoSync: StateFlow<PhotoSync?> = _photoSync.asStateFlow()
 
     private val _hubs = MutableStateFlow<List<DiscoveredHub>>(emptyList())
     val discoveredHubs: StateFlow<List<DiscoveredHub>> = _hubs.asStateFlow()
@@ -98,6 +105,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             _client.value?.close()
             _client.value = null
+            _photoSync.value?.close()
+            _photoSync.value = null
             _config.value = null
         }
     }
@@ -110,6 +119,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         c.connect(cfg.hubHost, DEFAULT_HUB_PORT)
         _client.value = c
+
+        _photoSync.value?.close()
+        _photoSync.value = if (cfg.role == Role.OFFICE) {
+            // Outbox survives app kills like the command queue; uploaded photos move to the cache.
+            val dir = File(getApplication<Application>().filesDir, "receipt-photos")
+            PhotoSync(viewModelScope, DirectoryPhotoOutbox(File(dir, "outbox"), File(dir, "cache")))
+                .also { it.start(cfg.hubHost, DEFAULT_HUB_PORT) }
+        } else {
+            null
+        }
     }
 
     fun submit(command: Command) {
@@ -153,5 +172,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         stopDiscovery()
         _client.value?.close()
+        _photoSync.value?.close()
     }
 }

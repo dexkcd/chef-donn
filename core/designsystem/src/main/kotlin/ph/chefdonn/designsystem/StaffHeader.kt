@@ -1,4 +1,4 @@
-package ph.chefdonn.app.screens
+package ph.chefdonn.designsystem
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,13 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import ph.chefdonn.client.ChefDonnClient
 import ph.chefdonn.client.SyncState
-import ph.chefdonn.designsystem.BannerKind
-import ph.chefdonn.designsystem.DonnDimens
-import ph.chefdonn.designsystem.DonnText
-import ph.chefdonn.designsystem.DonnType
-import ph.chefdonn.designsystem.RecoveryBanner
-import ph.chefdonn.designsystem.SyncIndicator
 
+/** Centavos → "₱1,234.50". Render it in a mono style so digits never misread. */
 fun formatPesos(cents: Long): String {
     val whole = cents / 100
     val frac = (cents % 100).toString().padStart(2, '0')

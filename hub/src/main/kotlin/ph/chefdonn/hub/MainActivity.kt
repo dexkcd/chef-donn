@@ -37,9 +37,11 @@ import ph.chefdonn.designsystem.DonnTextField
 import ph.chefdonn.designsystem.DonnType
 import ph.chefdonn.designsystem.donnColors
 import ph.chefdonn.domain.MenuItem
+import ph.chefdonn.domain.UpdateExpenseCategories
 import ph.chefdonn.domain.UpdateMenu
 import ph.chefdonn.domain.UpdateTables
 import ph.chefdonn.protocol.DEFAULT_HUB_PORT
+import ph.chefdonn.receipts.DefaultCategories
 import java.net.NetworkInterface
 import java.util.UUID
 
@@ -79,13 +81,16 @@ fun HubAdminScreen() {
         val state by engine.state.collectAsState()
         val devices by (HubRuntime.registry?.devices ?: MutableStateFlow(emptyList())).collectAsState()
 
-        LaunchedEffect(state.menu.isEmpty(), state.tables.isEmpty()) {
+        LaunchedEffect(state.menu.isEmpty(), state.tables.isEmpty(), state.expenseCategories.isEmpty()) {
             // First boot: seed so a demo works out of the box.
             if (state.tables.isEmpty()) {
                 engine.submit(UpdateTables(UUID.randomUUID().toString(), "hub", "Hub", SeedData.tables))
             }
             if (state.menu.isEmpty()) {
                 engine.submit(UpdateMenu(UUID.randomUUID().toString(), "hub", "Hub", SeedData.menu))
+            }
+            if (state.expenseCategories.isEmpty()) {
+                engine.submit(UpdateExpenseCategories(UUID.randomUUID().toString(), "hub", "Hub", DefaultCategories.all))
             }
         }
 
@@ -97,6 +102,7 @@ fun HubAdminScreen() {
                 StatusRow("Address", localIps().joinToString("  "))
                 StatusRow("Events", engine.currentSeq().toString())
                 StatusRow("Open tables", state.orders.values.count { !it.billed }.toString())
+                StatusRow("Receipts", state.receipts.values.count { !it.deleted }.toString())
 
                 DonnText("Connected Devices", style = DonnType.display)
                 if (devices.isEmpty()) DonnText("None yet", style = DonnType.body, color = donnColors.textSecondary)

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -129,6 +130,26 @@ fun PriorityTag(text: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         DonnText(text.uppercase(), style = DonnType.label, color = if (c.night) Brand.Night95 else Brand.Black)
+    }
+}
+
+/**
+ * Not-yet-synced marker for a row (receipt queued off mesh, photo not on the hub):
+ * gold pill, same glyph + color + label as QUEUED — never color alone.
+ */
+@Composable
+fun SyncTag(text: String, modifier: Modifier = Modifier) {
+    val c = donnColors
+    val fg = if (c.night) Brand.Night95 else Brand.Black
+    Row(
+        modifier
+            .background(c.accentGold, RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DonnDimens.space1),
+    ) {
+        DonnText("●", style = DonnType.label, color = fg)
+        DonnText(text.uppercase(), style = DonnType.label, color = fg)
     }
 }
 
@@ -253,6 +274,7 @@ fun DonnTextField(
     placeholder: String = "",
     singleLine: Boolean = true,
     textStyle: TextStyle = DonnType.body,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val c = donnColors
     BasicTextField(
@@ -266,6 +288,7 @@ fun DonnTextField(
         textStyle = textStyle.copy(color = c.textPrimary),
         cursorBrush = SolidColor(c.accentGreen),
         singleLine = singleLine,
+        keyboardOptions = keyboardOptions,
         decorationBox = { inner ->
             Box(contentAlignment = Alignment.CenterStart) {
                 if (value.isEmpty()) DonnText(placeholder, style = textStyle, color = c.textSecondary)

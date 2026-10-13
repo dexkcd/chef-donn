@@ -29,6 +29,7 @@ import ph.chefdonn.designsystem.DonnText
 import ph.chefdonn.designsystem.DonnType
 import ph.chefdonn.designsystem.DsGallery
 import ph.chefdonn.domain.Role
+import ph.chefdonn.receipts.ui.ReceiptsScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,6 +45,7 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
     val loaded by vm.loaded.collectAsState()
     val config by vm.config.collectAsState()
     val client by vm.client.collectAsState()
+    val photoSync by vm.photoSync.collectAsState()
     val context = LocalContext.current
 
     // Rejections must be seen, not swallowed.
@@ -96,6 +98,10 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
                 Role.WAITER -> WaiterScreen(cfg, c, vm)
                 Role.KITCHEN -> KitchenScreen(cfg, c, vm)
                 Role.CASHIER -> CashierScreen(cfg, c, vm)
+                Role.OFFICE -> {
+                    val photos = photoSync ?: return
+                    ReceiptsScreen(cfg.deviceId, cfg.deviceName, c, photos, vm::submit)
+                }
                 Role.HUB -> SetupScreen(vm = vm, onOpenGallery = null)
             }
         }

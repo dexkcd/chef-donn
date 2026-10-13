@@ -7,9 +7,11 @@ before it on paper. Three apps, one local hub, zero changes to the existing POS:
 - **Waiter app** (phone) — take orders table-side, fire to kitchen, live per-item status
 - **Kitchen app / KDS** (tablet, dark) — station tickets, bump, timers
 - **Cashier app** (tablet, read-only) — live running tab per table, one action: Mark Billed
+- **Office app** (back office) — expense receipts: photograph, OCR pre-fills vendor/date/total,
+  file by category, month totals; works off mesh at the market and syncs on return
 - **Hub** (cheap Android box) — the source of truth: append-only order stream over local WiFi
 
-No payments, no receipts, no BIR CAS, no cloud during service.
+No payments, no customer receipts, no BIR CAS, no cloud during service.
 
 ## Architecture
 
@@ -20,6 +22,11 @@ queue commands (idempotent by UUID) and reconcile on rejoin; the hub replays its
 on reboot. Void-vs-bump conflicts resolve deterministically: void wins, the bump is
 rejected loudly.
 
+Receipts ride the same log (`ReceiptRecorded`, `ExpenseCategoriesUpdated`, …) but only
+stream to Office devices, so expense data never lands on a waiter's phone. Receipt
+photos are write-once blobs beside the log (`PUT/GET /photos/{uuid}` on the hub),
+uploaded from a durable on-device outbox.
+
 ## Modules
 
 | Module | What it is |
@@ -28,19 +35,21 @@ rejected loudly.
 | `core/protocol` | WebSocket wire messages (Hello / Submit / Welcome / Events / Ack) |
 | `core/hubserver` | Ktor server + SQLDelight event log (JVM-testable, Android-embeddable) |
 | `core/client` | Client sync engine: pending queue, catch-up, reconnect |
+| `core/receipts` | Pure Kotlin: receipt OCR text parser, category suggester, month totals |
 | `core/designsystem` | Compose theme + components from the Chef Donn's design system |
+| `feature/receipts` | Office role UI: camera/gallery capture, on-device OCR (ML Kit), receipt book |
 | `hub/` | Android hub app: foreground service, NSD advertising, admin screen |
-| `app/` | Single staff APK: role picked at setup → Waiter / Kitchen / Cashier UI |
+| `app/` | Single staff APK: role picked at setup → Waiter / Kitchen / Cashier / Office UI |
 
 ## Build
 
 Requires JDK 17 and the Android SDK (platform 34).
 
 ```bash
-./gradlew test                    # domain + hub server tests (JVM, no device)
+./gradlew test                    # domain, receipts + hub server tests (JVM, no device)
 ./gradlew :hub:assembleDebug :app:assembleDebug
 ```
 
 Install the hub APK on one device, the staff APK on the rest; staff devices discover
-the hub over WiFi (mDNS) or by typed IP. The hub seeds a sample menu and tables T1–T10
-on first boot.
+the hub over WiFi (mDNS) or by typed IP. The hub seeds a sample menu, tables T1–T10 and
+the default expense categories on first boot.

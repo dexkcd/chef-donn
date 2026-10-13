@@ -37,6 +37,7 @@ kotlin {
 dependencies {
     implementation(project(":core:hubserver"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:receipts"))
     implementation(libs.sqldelight.android.driver)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

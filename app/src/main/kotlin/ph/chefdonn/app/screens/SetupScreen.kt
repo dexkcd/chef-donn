@@ -63,6 +63,8 @@ fun SetupScreen(vm: AppViewModel, onOpenGallery: (() -> Unit)?) {
                     RoleButton("Kitchen", role == Role.KITCHEN, Modifier.weight(1f)) { role = Role.KITCHEN }
                     RoleButton("Cashier", role == Role.CASHIER, Modifier.weight(1f)) { role = Role.CASHIER }
                 }
+                // Back office, not service: expense receipts.
+                RoleButton("Office — Receipts", role == Role.OFFICE, Modifier.fillMaxWidth()) { role = Role.OFFICE }
 
                 DonnText("2 · Name it", style = DonnType.display)
                 DonnTextField(
@@ -72,6 +74,7 @@ fun SetupScreen(vm: AppViewModel, onOpenGallery: (() -> Unit)?) {
                         Role.WAITER -> "e.g. Ana"
                         Role.KITCHEN -> "e.g. Grill Station"
                         Role.CASHIER -> "e.g. Front Counter"
+                        Role.OFFICE -> "e.g. Manager's Tablet"
                         else -> "Device name"
                     },
                     modifier = Modifier.fillMaxWidth(),
